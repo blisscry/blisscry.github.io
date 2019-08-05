@@ -1,30 +1,35 @@
 ---
 layout: default
 ---
-<article class="post container">
-  <div class="post-meta">
-    <span class="post-meta-span date">{{ page.date | date:"%Y %B %d" }}</span>
-    {% if page.tags.size > 0 %}
-    <span class="post-meta-span tag">{{ page.tags | join: ', ' }}</span>
-    {% endif %}
-  </div>
+<h2 style="margin-bottom: -20px;">{{ page.title }}</h2>
+<p class="post-date">{{ page.date | date_to_string }}</p>
 
-  <h1 class="post-title">{{ page.title }}</h1>
-  {{ content }}
-</article>
-
-<div class="post-share">
-  <div class="container">
-    <a href="https://twitter.com/share?url={{ page.url | prepend: site.baseurl | prepend: site.url }}&text={{ page.title }}" target="_blank" class="post-share-icon twitter"></a>
-    <a href="https://www.evernote.com/clip.action?url={{ page.url | prepend: site.baseurl | prepend: site.url }}&title={{ page.title }}" target="_blank" class="post-share-icon evernote"></a>
-    <a href="http://service.weibo.com/share/share.php?url={{ page.url | prepend: site.baseurl | prepend: site.url }}&title={{ page.title }}" target="_blank" class="post-share-icon weibo"></a>
-  </div>
+<div class="post">
+{{ content }}
 </div>
+
+<a class="twitter-share-button"
+   href="https://twitter.com/intent/tweet?text={{page.title}}"
+   data-hashtags="{{ page.tags | join: ', ' }}"
+   data-via="{{ site.owner.twitter_username }}"
+   data-size="large">Tweet</a>
+<script>window.twttr = (function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0],
+    t = window.twttr || {};
+  if (d.getElementById(id)) return t;
+  js = d.createElement(s);
+  js.id = id;
+  js.src = "https://platform.twitter.com/widgets.js";
+  fjs.parentNode.insertBefore(js, fjs);
+
+  t._e = [];
+  t.ready = function(f) {
+    t._e.push(f);
+  };
+
+  return t;
+}(document, "script", "twitter-wjs"));</script>
 
 {% if site.disqus_shortname %}
-<div class="comment container">
-  <div id="disqus_thread">
-    <a href=""></a>
-  </div>
-</div>
+{% include disqus_comments.html %}
 {% endif %}

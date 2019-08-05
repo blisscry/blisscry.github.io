@@ -1,40 +1,37 @@
-theme: jekyll-theme-cayman
+name: White Paper
+description: >
+    A simple jekyll theme aimed at programmers who like clean interface to write posts
+    and show off some code.
+about: >
+    At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat.
 
-# Site settings
-title: Your awesome title
-email: your-email@domain.com
-description: > # this means to ignore newlines until "baseurl:"
-  Write an awesome description for your new site here. You can edit this
-  line in _config.yml. It will appear in your document head meta (for
-  Google search results) and in your feed.xml site description.
-baseurl: "" # the subpath of your site, e.g. /blog/
-url: "http://yourdomain.com" # the base hostname & protocol for your site
-
-
-# Sidebar filter
-# Choose 'tag' or 'category' as filter in sidebar.
-filter: 'tag'
-
-
-# Social account
-# twitter:  username
-# weibo:    ID
-# github:   username
-# codepen:  username
-# dribbble: username
-
-
-# Comment
-# disqus_shortname: discussion_shortname
-
-
-# Google Analytics
-# google_analytics: tracking_ID
-
-
-# Build settings
+master_repo: false
+url: "http://vinitkumar.me/white-paper"
 markdown: kramdown
-sass:
-  style: compressed
-gems:
-  - jekyll-sitemap
+highlighter: rouge
+
+plugins: ['jekyll-paginate', 'jekyll-gist', 'jekyll-feed']
+
+paginate: 4
+
+logo:             logo.png
+disqus_shortname:
+
+rtl: false
+owner:
+  name:           whitepaper
+  avatar:         "https://avatars1.githubusercontent.com/u/537678?s=240&v=4"
+  email:          "vinit1414.08@bitmesra.ac.in"
+  # Social networking links used in footer. Update and remove as you like.
+  twitter: vinitkme
+  github: https://github.com/vinitkumar
+  stackexchange: https://stackoverflow.com/users/859112/vinit-kumar?tab=profile
+  linkedin: https://www.linkedin.com/in/vinitatlinkedin
+  # For Google Authorship https://plus.google.com/authorship
+  google_plus:
+
+# Analytics and webmaster tools stuff goes here
+google_analytics:
+google_verify:
+# https://ssl.bing.com/webmaster/configure/verify/ownership Option 2 content= goes here
+bing_verify:
