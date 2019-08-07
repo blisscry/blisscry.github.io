@@ -1,3 +1,15 @@
+---
+layout:     post
+title:      SpringApplication源码
+subtitle:   源码研究（一）
+date:       2019-08-07
+author:     skaleto
+header-img: img/post-bg-ios9-web.jpg
+catalog: true
+tags:
+    - spring boot
+---
+
 SpringApplication 启动类
 
 ### 
