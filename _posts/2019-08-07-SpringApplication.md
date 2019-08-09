@@ -401,30 +401,31 @@ public ConfigurableApplicationContext run(String... args) {
 		//java.awt.headless是J2SE的一种模式用于在缺少显示屏、键盘或者鼠标时的系统配置，很多监控工具如jconsole 需要将该值设置为true，系统变量默认为true
 		configureHeadlessProperty();
 		//获取spring.factories中的监听器变量，args为指定的参数数组，默认为当前类SpringApplication
-		//第一步：获取并启动监听器，在这一步中获取的是SpringApplicationRunListener
+		//获取并启动监听器，在这一步中获取的是SpringApplicationRunListener
 		SpringApplicationRunListeners listeners = getRunListeners(args);
     	//这一步会加载到的listener实际上为EventPublishingRunListener
 		listeners.starting();
 		try {
             //将传入的参数转化为spring格式的参数
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
-			//3.（1）第二步：构造容器环境 
+			//3.1 构造容器环境 
 			ConfigurableEnvironment environment = prepareEnvironment(listeners,
 					applicationArguments);
 			//设置需要忽略的bean
-			configureIgnoreBeanInfo(environment);
-			//打印banner
+			//configureIgnoreBeanInfo(environment);
+			//打印banner，可以定制
 			Banner printedBanner = printBanner(environment);
-			//第三步：创建容器
+			//3.2 创建容器
 			context = createApplicationContext();
-			//第四步：实例化SpringBootExceptionReporter.class，用来支持报告关于启动的错误
+			//实例化SpringBootExceptionReporter.class，用来支持报告关于启动的错误
 			exceptionReporters = getSpringFactoriesInstances(
 					SpringBootExceptionReporter.class,
 					new Class[] { ConfigurableApplicationContext.class }, context);
-			//第五步：准备容器
+            //这一步在spring1.x中是analyzers = new FailureAnalyzers(context);内部逻辑差不多，都是创建错误分析器的实例
+			//3.3 准备容器
 			prepareContext(context, environment, listeners, applicationArguments,
 					printedBanner);
-			//第六步：刷新容器
+			//3.4 刷新容器
 			refreshContext(context);
 			//第七步：刷新容器后的扩展接口
 			afterRefresh(context, applicationArguments);
@@ -455,7 +456,7 @@ public ConfigurableApplicationContext run(String... args) {
 
 
 
-#### （1）prepareEnvironment
+#### 3.1 构造容器环境
 
 ```java
 private ConfigurableEnvironment prepareEnvironment(
@@ -465,6 +466,7 @@ private ConfigurableEnvironment prepareEnvironment(
 	// 本例中是web环境，因此返回一个StandardServletEnvironment
 	ConfigurableEnvironment environment = getOrCreateEnvironment();
 	configureEnvironment(environment, applicationArguments.getSourceArgs());
+    // 通知SpringApplicationRunListeners环境准备好的事件
 	listeners.environmentPrepared(environment);
 	if (!this.webEnvironment) {
 		environment = new EnvironmentConverter(getClassLoader())
@@ -476,6 +478,10 @@ private ConfigurableEnvironment prepareEnvironment(
 
 configureEnvironment主要做的事情
 
+① 加载系统配置
+
+② 加载活动 profile
+
 ```java
 protected void configureEnvironment(ConfigurableEnvironment environment,
 		String[] args) {
@@ -485,11 +491,13 @@ protected void configureEnvironment(ConfigurableEnvironment environment,
 
 protected void configurePropertySources(ConfigurableEnvironment environment,
 		String[] args) {
+    //这一步跟进去可以看到加载到的properties有servletConfigInitParams，servletContextInitParams，systemProperties，systemEnvironment，前两个在这一环节中没有东西，后两个包含了一些系统的信息，比如java环境路径，版本号，计算机名称和环境变量等等
 	MutablePropertySources sources = environment.getPropertySources();
 	if (this.defaultProperties != null && !this.defaultProperties.isEmpty()) {
 		sources.addLast(
 				new MapPropertySource("defaultProperties", this.defaultProperties));
 	}
+    //如果带有命令行参数，也会放到sources中
 	if (this.addCommandLineProperties && args.length > 0) {
 		String name = CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME;
 		if (sources.contains(name)) {
@@ -506,8 +514,445 @@ protected void configurePropertySources(ConfigurableEnvironment environment,
 	}
 }
 
-
 ```
+
+
+
+listeners.environmentPrepared(environment);用于通知SpringApplicationRunListeners环境准备好的事件，跟进去后发现调用了SimpleApplicationEventMulticaster#multicastEvent，
+
+```java
+@Override
+public void multicastEvent(final ApplicationEvent event, ResolvableType eventType) {
+	ResolvableType type = (eventType != null ? eventType : resolveDefaultEventType(event));
+	for (final ApplicationListener<?> listener : getApplicationListeners(event, type)) {
+		Executor executor = getTaskExecutor();
+		if (executor != null) {
+			executor.execute(new Runnable() {
+				@Override
+				public void run() {
+					invokeListener(listener, event);
+				}
+			});
+		}
+		else {
+			invokeListener(listener, event);
+		}
+	}
+}
+```
+
+listener列表中有一个ConfigFileApplicationListener比较常见，会从classpath:，file:./，classpath:config/，file:./config/:中寻找application.properties或application.yml
+```
+/**
+ * {@link EnvironmentPostProcessor} that configures the context environment by loading
+ * properties from well known file locations. By default properties will be loaded from
+ * 'application.properties' and/or 'application.yml' files in the following locations:
+ * <ul>
+ * <li>classpath:</li>
+ * <li>file:./</li>
+ * <li>classpath:config/</li>
+ * <li>file:./config/:</li>
+ * </ul>
+ * <p>
+ * Alternative search locations and names can be specified using
+ * {@link #setSearchLocations(String)} and {@link #setSearchNames(String)}.
+ * <p>
+ * Additional files will also be loaded based on active profiles. For example if a 'web'
+ * profile is active 'application-web.properties' and 'application-web.yml' will be
+ * considered.
+ * <p>
+ * The 'spring.config.name' property can be used to specify an alternative name to load
+ * and the 'spring.config.location' property can be used to specify alternative search
+ * locations or specific files.
+ * <p>
+ * Configuration properties are also bound to the {@link SpringApplication}. This makes it
+ * possible to set {@link SpringApplication} properties dynamically, like the sources
+ * ("spring.main.sources" - a CSV list) the flag to indicate a web environment
+ * ("spring.main.web_environment=true") or the flag to switch off the banner
+ * ("spring.main.show_banner=false").
+```
+
+
+
+#### 3.2 创建容器
+
+在本例中，webEnvironment为true，因此contextClass为DEFAULT_WEB_CONTEXT_CLASS，同样通过反射的方式创建一个实例
+
+```java
+protected ConfigurableApplicationContext createApplicationContext() {
+	Class<?> contextClass = this.applicationContextClass;
+	if (contextClass == null) {
+		try {
+			contextClass = Class.forName(this.webEnvironment
+					? DEFAULT_WEB_CONTEXT_CLASS : DEFAULT_CONTEXT_CLASS);
+		}
+		catch (ClassNotFoundException ex) {
+			throw new IllegalStateException("",ex);
+		}
+	}
+	return (ConfigurableApplicationContext) BeanUtils.instantiate(contextClass);
+}
+
+public static final String DEFAULT_WEB_CONTEXT_CLASS = "org.springframework."
+		+ "boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext";
+```
+
+//TODO
+
+
+
+#### 3.3 准备容器
+
+```java
+private void prepareContext(ConfigurableApplicationContext context,
+      ConfigurableEnvironment environment, SpringApplicationRunListeners listeners,
+      ApplicationArguments applicationArguments, Banner printedBanner) {
+   context.setEnvironment(environment);
+   postProcessApplicationContext(context);
+   // 在上面实例化的initializers在这一步里面被实例化
+   applyInitializers(context);
+   // 通知initializers容器上下文已经准备好了
+   listeners.contextPrepared(context);
+   if (this.logStartupInfo) {
+      logStartupInfo(context.getParent() == null);
+      logStartupProfileInfo(context);
+   }
+
+   // Add boot specific singleton beans
+   context.getBeanFactory().registerSingleton("springApplicationArguments",
+         applicationArguments);
+   if (printedBanner != null) {
+      context.getBeanFactory().registerSingleton("springBootBanner", printedBanner);
+   }
+
+   // Load the sources
+   Set<Object> sources = getSources();
+   Assert.notEmpty(sources, "Sources must not be empty");
+   load(context, sources.toArray(new Object[sources.size()]));
+   // 最后通知所有listener上下文已经加载完毕
+   listeners.contextLoaded(context);
+}
+```
+
+
+
+```java
+protected void load(ApplicationContext context, Object[] sources) {
+	if (logger.isDebugEnabled()) {}
+	BeanDefinitionLoader loader = createBeanDefinitionLoader(
+			getBeanDefinitionRegistry(context), sources);
+	if (this.beanNameGenerator != null) {
+		loader.setBeanNameGenerator(this.beanNameGenerator);
+	}
+	if (this.resourceLoader != null) {
+		loader.setResourceLoader(this.resourceLoader);
+	}
+	if (this.environment != null) {
+		loader.setEnvironment(this.environment);
+	}
+	loader.load();
+}
+
+public int load() {
+   int count = 0;
+   for (Object source : this.sources) {
+      count += load(source);
+   }
+   return count;
+}
+
+private int load(Object source) {
+   Assert.notNull(source, "Source must not be null");
+   if (source instanceof Class<?>) {
+      return load((Class<?>) source);
+   }
+   if (source instanceof Resource) {
+      return load((Resource) source);
+   }
+   if (source instanceof Package) {
+      return load((Package) source);
+   }
+   if (source instanceof CharSequence) {
+      return load((CharSequence) source);
+   }
+   throw new IllegalArgumentException("Invalid source type " + source.getClass());
+}
+
+private int load(Class<?> source) {
+   // 检查groovy是否被加载，以后再深入
+   if (isGroovyPresent()) {
+      // Any GroovyLoaders added in beans{} DSL can contribute beans here
+   }
+   // 检查source上的注解是否是Component，本例中此处source为启动类MyAapplication.class
+   if (isComponent(source)) {
+      //3.3.1 注册bean
+      this.annotatedReader.register(source);
+      return 1;
+   }
+   return 0;
+}
+
+private boolean isComponent(Class<?> type) {
+	// This has to be a bit of a guess. The only way to be sure that this type is
+	// eligible is to make a bean definition out of it and try to instantiate it.
+	if (AnnotationUtils.findAnnotation(type, Component.class) != null) {
+		return true;
+	}
+	// Nested anonymous classes are not eligible for registration, nor are groovy
+	// closures
+	if (type.getName().matches(".*\\$_.*closure.*") || type.isAnonymousClass()
+			|| type.getConstructors() == null || type.getConstructors().length == 0) {
+		return false;
+	}
+	return true;
+}
+
+@SuppressWarnings("unchecked")
+private static <A extends Annotation> A findAnnotation(Class<?> clazz, Class<A> annotationType, boolean synthesize) {
+	Assert.notNull(clazz, "Class must not be null");
+	if (annotationType == null) {
+		return null;
+	}
+    // 由于后面是通过反射来查找注解的，因此这里对注解做了一个缓存
+	AnnotationCacheKey cacheKey = new AnnotationCacheKey(clazz, annotationType);
+	A result = (A) findAnnotationCache.get(cacheKey);
+	if (result == null) {
+		result = findAnnotation(clazz, annotationType, new HashSet<Annotation>());
+		if (result != null && synthesize) {
+			result = synthesizeAnnotation(result, clazz);
+			findAnnotationCache.put(cacheKey, result);
+		}
+	}
+	return result;
+}
+
+@SuppressWarnings("unchecked")
+private static <A extends Annotation> A findAnnotation(Class<?> clazz, Class<A> annotationType, Set<Annotation> visited) {
+	try {
+		Annotation[] anns = clazz.getDeclaredAnnotations();
+        // 在本例中，获得的anns显然只有一个@SpringBootApplication，并且不是@Component
+		for (Annotation ann : anns) {
+			if (ann.annotationType() == annotationType) {
+				return (A) ann;
+			}
+		}
+		for (Annotation ann : anns) {
+            // 检查注解是不是jdk自带的一些注解，这些可以直接跳过，如果不是则尝试将这个注解放到visited集合中，如果集合中已有，也跳过
+			if (!isInJavaLangAnnotationPackage(ann) && visited.add(ann)) {
+                //随后递归检查注解中的子注解，最终可看到@SpringBootApplication中的@SpringBootConfiguration的@Configuration为一个Component
+				A annotation = findAnnotation(ann.annotationType(), annotationType, visited);
+				if (annotation != null) {
+					return annotation;
+				}
+			}
+		}
+	}
+	...
+}
+```
+
+
+
+##### 3.3.1 注册bean
+
+```java
+@SuppressWarnings("unchecked")
+public void registerBean(Class<?> annotatedClass, String name, Class<? extends Annotation>... qualifiers) {
+   AnnotatedGenericBeanDefinition abd = new AnnotatedGenericBeanDefinition(annotatedClass);
+   if (this.conditionEvaluator.shouldSkip(abd.getMetadata())) {
+      return;
+   }
+
+   ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(abd);
+   abd.setScope(scopeMetadata.getScopeName());
+   // 获取bean名称，默认情况下，为小写类名
+   String beanName = (name != null ? name : this.beanNameGenerator.generateBeanName(abd, this.registry));
+   AnnotationConfigUtils.processCommonDefinitionAnnotations(abd);
+   if (qualifiers != null) {
+      for (Class<? extends Annotation> qualifier : qualifiers) {
+         if (Primary.class == qualifier) {
+            abd.setPrimary(true);
+         }
+         else if (Lazy.class == qualifier) {
+            abd.setLazyInit(true);
+         }
+         else {
+            abd.addQualifier(new AutowireCandidateQualifier(qualifier));
+         }
+      }
+   }
+
+   BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(abd, beanName);
+   definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
+   // 此处是注册bean的方法
+   BeanDefinitionReaderUtils.registerBeanDefinition(definitionHolder, this.registry);
+}
+```
+
+注册bean的方法如下，简单说就是将当前的application bean放入DefaultListableBeanFactory中beanDefinition相关的map中
+
+```java
+@Override
+public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)
+      throws BeanDefinitionStoreException {
+
+   Assert.hasText(beanName, "Bean name must not be empty");
+   Assert.notNull(beanDefinition, "BeanDefinition must not be null");
+
+   if (beanDefinition instanceof AbstractBeanDefinition) {
+      try {
+         ((AbstractBeanDefinition) beanDefinition).validate();
+      }
+      catch (BeanDefinitionValidationException ex) {
+         throw new BeanDefinitionStoreException(beanDefinition.getResourceDescription(), beanName,
+               "Validation of bean definition failed", ex);
+      }
+   }
+
+   BeanDefinition oldBeanDefinition;
+
+   oldBeanDefinition = this.beanDefinitionMap.get(beanName);
+   if (oldBeanDefinition != null) {
+      if (!isAllowBeanDefinitionOverriding()) {
+         throw new BeanDefinitionStoreException(beanDefinition.getResourceDescription(), beanName,
+               "Cannot register bean definition [" + beanDefinition + "] for bean '" + beanName +
+               "': There is already [" + oldBeanDefinition + "] bound.");
+      }
+      else if (oldBeanDefinition.getRole() < beanDefinition.getRole()) {
+         // e.g. was ROLE_APPLICATION, now overriding with ROLE_SUPPORT or ROLE_INFRASTRUCTURE
+         if (this.logger.isWarnEnabled()) {
+            this.logger.warn("Overriding user-defined bean definition for bean '" + beanName +
+                  "' with a framework-generated bean definition: replacing [" +
+                  oldBeanDefinition + "] with [" + beanDefinition + "]");
+         }
+      }
+      else if (!beanDefinition.equals(oldBeanDefinition)) {
+         if (this.logger.isInfoEnabled()) {
+            this.logger.info("Overriding bean definition for bean '" + beanName +
+                  "' with a different definition: replacing [" + oldBeanDefinition +
+                  "] with [" + beanDefinition + "]");
+         }
+      }
+      else {
+         if (this.logger.isDebugEnabled()) {
+            this.logger.debug("Overriding bean definition for bean '" + beanName +
+                  "' with an equivalent definition: replacing [" + oldBeanDefinition +
+                  "] with [" + beanDefinition + "]");
+         }
+      }
+      this.beanDefinitionMap.put(beanName, beanDefinition);
+   }
+   else {
+      if (hasBeanCreationStarted()) {
+         // Cannot modify startup-time collection elements anymore (for stable iteration)
+         synchronized (this.beanDefinitionMap) {
+            this.beanDefinitionMap.put(beanName, beanDefinition);
+            List<String> updatedDefinitions = new ArrayList<String>(this.beanDefinitionNames.size() + 1);
+            updatedDefinitions.addAll(this.beanDefinitionNames);
+            updatedDefinitions.add(beanName);
+            this.beanDefinitionNames = updatedDefinitions;
+            if (this.manualSingletonNames.contains(beanName)) {
+               Set<String> updatedSingletons = new LinkedHashSet<String>(this.manualSingletonNames);
+               updatedSingletons.remove(beanName);
+               this.manualSingletonNames = updatedSingletons;
+            }
+         }
+      }
+      else {
+         // Still in startup registration phase
+         this.beanDefinitionMap.put(beanName, beanDefinition);
+         this.beanDefinitionNames.add(beanName);
+         this.manualSingletonNames.remove(beanName);
+      }
+      this.frozenBeanDefinitionNames = null;
+   }
+
+   if (oldBeanDefinition != null || containsSingleton(beanName)) {
+      resetBeanDefinition(beanName);
+   }
+}
+```
+
+
+
+#### 3.4 刷新容器
+
+
+
+```java
+@Override
+public void refresh() throws BeansException, IllegalStateException {
+   synchronized (this.startupShutdownMonitor) {
+      // Prepare this context for refreshing.
+      prepareRefresh();
+
+      // Tell the subclass to refresh the internal bean factory.
+      ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+
+      // Prepare the bean factory for use in this context.
+      prepareBeanFactory(beanFactory);
+
+      try {
+         // Allows post-processing of the bean factory in context subclasses.
+         postProcessBeanFactory(beanFactory);
+
+         // Invoke factory processors registered as beans in the context.
+         invokeBeanFactoryPostProcessors(beanFactory);
+
+         // Register bean processors that intercept bean creation.
+         registerBeanPostProcessors(beanFactory);
+
+         // Initialize message source for this context.
+         initMessageSource();
+
+         // Initialize event multicaster for this context.
+         initApplicationEventMulticaster();
+
+         // Initialize other special beans in specific context subclasses.
+         onRefresh();
+
+         // Check for listener beans and register them.
+         registerListeners();
+
+         // Instantiate all remaining (non-lazy-init) singletons.
+         finishBeanFactoryInitialization(beanFactory);
+
+         // Last step: publish corresponding event.
+         finishRefresh();
+      }
+
+      catch (BeansException ex) {
+         if (logger.isWarnEnabled()) {
+            logger.warn("Exception encountered during context initialization - " +
+                  "cancelling refresh attempt: " + ex);
+         }
+
+         // Destroy already created singletons to avoid dangling resources.
+         destroyBeans();
+
+         // Reset 'active' flag.
+         cancelRefresh(ex);
+
+         // Propagate exception to caller.
+         throw ex;
+      }
+
+      finally {
+         // Reset common introspection caches in Spring's core, since we
+         // might not ever need metadata for singleton beans anymore...
+         resetCommonCaches();
+      }
+   }
+}
+```
+
+
+
+
+
+
+
+
 
 
 
