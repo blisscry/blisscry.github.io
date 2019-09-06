@@ -1,3 +1,17 @@
+---
+layout:     post
+title:      springboot静态资源映射
+subtitle:   springboot
+date:       2019-01-25
+author:     skaleto
+header-img: img/post-bg-ios9-web.jpg
+catalog: true
+tags:
+    - springboot
+
+
+---
+
 
 
 我们都知道，在springboot中，可以通过配置静态资源映射，达到自定义资源映射路径，示例如下：
