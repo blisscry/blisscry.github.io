@@ -13,6 +13,8 @@ tags:
 
 # SpringApplication 启动类
 
+[TOC]
+
 
 
 我们在创建一个springboot项目的时候，一般会自动生成一个启动类
@@ -956,4 +958,31 @@ public void refresh() throws BeansException, IllegalStateException {
 
 
 
-### 二、@SpringBootApplication
+## 二、@SpringBootApplication
+
+scanBasePackages
+
+exclude=MongoAutoConfiguration.class
+
+
+
+## 三、其他注解
+
+### @ComponentScan
+
+### @EnableAutoConfiguration
+
+### @EnableAsync
+
+### @EnableScheduling
+
+### @EnableTransactionManagement
+
+
+
+
+
+## 四、外部化配置
+
+### @PropertySource
+
