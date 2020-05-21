@@ -193,6 +193,15 @@ Zab 通过巧妙的设计 ZXID来实现这一目的。一个 zxid 是64位，高
 
 
 
+Zookeeper实现分布式锁非常方便，例如Curator的InterProcessMutex，能有效解决分布式问题、不可重入问题。但是由于Zookeeper的创建锁和释放锁的过程，都需要动态进行节点的创建和销毁，由于zk集群中节点的创建销毁都需要经过leader将消息发布给其他节点，这样频繁的网络通信使得性能成为一个问题。因此，在高并发、高性能的场景下，一般不使用Zookeeper实现分布式锁。
+
+对于分布式锁，比较成熟、主流的方案有两种：
+
+- 基于redis的分布式锁，适用于并发量很大、性能要求很高的场景
+- 基于Zookeeper的分布式锁，适用于高可靠而并发量不是很大的场景
+
+
+
 ### ZK实现简单的分布式队列
 
 1. **数据结构**
@@ -286,6 +295,43 @@ K-V结构，按照Key的字母序排列
 ### 序列化
 
 序列化方案：Apache Jute，
+
+
+
+
+
+
+
+## Zookeeper分布式事件监听
+
+实现对Zookeeper服务器端的时间监听有两种办法：
+
+- 标准观察者模式，通过Watcher监听器实现
+- 缓存监听模式，本地缓存视图Cache机制
+
+watcher监听器是一次性的，意味着当监听被触发一次后，我们需要再次进行watcher的注册，因此watcher监听器不适用于节点或节点数据频繁变动变动的场景，而使用于一些特殊的变动不频繁的场景，例如会话超时、授权失败等场景。
+
+为了解决watcher机制反复注册比较繁琐的问题，Curator引入了Cache来监听Zookeeper服务器端事件。
+
+Curator引入的Cache缓存机制包括Node Cache、Path Cache、Tree Cache三类。
+
+- Node Cache，可用于ZNode节点的监听
+- Path Cache，可用于ZNode的子节点的监听
+- Tree Cache，不仅能监听子节点，还能监听ZNode节点自身，相当于是Node Cache和Path Cache的集合
+
+三种Cache底层都调用了Zookeeper的watcher，对于数据的处理，都是通过比较本地缓存中的数据是否和zookeeper服务器中的数据相同。
+
+
+
+## Zookeeper Session
+
+为了高效地管理zk中的session，zk设计了一个桶的模式来处理session的过期策略，由于zookeeper面向的是并发相对较高的场景，如果会话到期后立即执行过期策略，那么无疑将带来很大的性能压力，zookeeper的策略是将过期时间在一定范围内的session放到一个桶中，按照这个桶的标准时间进行统一过期操作，这样避免了频繁的操作
+
+<img src="../img/paxos&amp;zookeeper/session.png" alt="image-20200125163756279" style="zoom:50%;" />
+
+
+
+
 
 
 
